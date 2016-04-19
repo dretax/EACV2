@@ -1,0 +1,16 @@
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\EACV2.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\EACV2.pdb
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\Assembly-CSharp.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\Facepunch.ID.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\Fougerite.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\uLink.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\UnityEngine.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\Facepunch.HitBox.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\Google.ProtocolBuffers.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\Google.ProtocolBuffers.Serialization.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\Facepunch.MeshBatch.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\RustPP.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\Fougerite.pdb
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\bin\Debug\RustPP.pdb
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\obj\Debug\EACV2.dll
+C:\Users\DreTaX\Documents\Visual Studio 2015\Projects\EAC2.0\EACV2\obj\Debug\EACV2.pdb
