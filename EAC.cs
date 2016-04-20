@@ -97,7 +97,7 @@ namespace EACV2
         public static float walkspeedMinDistance = 6f;
         public static float walkspeedMaxDistance = 15f;
         public static float walkspeedDropIgnore = 8f;
-        public static float speedMinDistance = 14f;
+        public static float speedMinDistance = 11f;
         public static float speedMaxDistance = 25f;
         public static float speedDropIgnore = 8f;
 
@@ -118,7 +118,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0"); }
+            get { return new Version("2.0.1"); }
         }
 
         public override void Initialize()
@@ -205,6 +205,8 @@ namespace EACV2
             Fougerite.Hooks.OnCommand += OnCommand;
             Fougerite.Hooks.OnEntityHurt += OnEntityHurt;
             Fougerite.Hooks.OnPlayerHurt += OnPlayerHurt;
+            Fougerite.Hooks.OnPlayerTeleport += OnPlayerTeleport;
+            Fougerite.Hooks.OnEntityDeployedWithPlacer += OnEntityDeployed;
             Start();
         }
 
@@ -220,6 +222,8 @@ namespace EACV2
             Fougerite.Hooks.OnCommand -= OnCommand;
             Fougerite.Hooks.OnEntityHurt -= OnEntityHurt;
             Fougerite.Hooks.OnPlayerHurt -= OnPlayerHurt;
+            Fougerite.Hooks.OnPlayerTeleport -= OnPlayerTeleport;
+            Fougerite.Hooks.OnEntityDeployedWithPlacer -= OnEntityDeployed;
         }
 
         private void ReloadConfig()
@@ -299,7 +303,7 @@ namespace EACV2
             {
                 foreach (Fougerite.Player p in Server.GetServer().Players)
                 {
-                    if (p.Admin || p.Moderator)
+                    if ((p.Admin || p.Moderator) && !Debug.Contains(p.UID))
                     {
                         continue;
                     }
@@ -327,9 +331,66 @@ namespace EACV2
          *
          */
 
+        public void OnPlayerTeleport(Fougerite.Player player, Vector3 from, Vector3 dest)
+        {
+            if (!Teleport) { return;}
+            var dict = new Dictionary<string, object>();
+            dict["Player"] = player;
+            dict["Dest"] = dest;
+            dict["Trial"] = 1;
+            dict["teleport"] = 1;
+            CreateParallelTimer(2000, dict).Start();
+        }
+
         public void OnPlayerDisconnected(Fougerite.Player player)
         {
             DataStore.GetInstance().Add("EACDizzy", player.UID, player.DisconnectLocation);
+        }
+
+        public void OnEntityDeployed(Fougerite.Player pl, Fougerite.Entity e, Fougerite.Player actualplacer)
+        {
+            if (FlyandJump)
+            {
+                if (!e.Name.ToLower().Contains("stash") && !e.Name.ToLower().Contains("box") &&
+                    !e.Name.ToLower().Contains("furnace") && !e.Name.ToLower().Contains("fire"))
+                {
+                    if (FlySuspect.ContainsKey(actualplacer.UID))
+                    {
+                        FlySuspect.Remove(actualplacer.UID);
+                    }
+                    if (SustainedDetection.ContainsKey(actualplacer.UID))
+                    {
+                        SustainedDetection.Remove(actualplacer.UID);
+                    }
+                    if (FlySuspectC.ContainsKey(actualplacer.UID))
+                    {
+                        FlySuspectC.Remove(actualplacer.UID);
+                    }
+                    if (!SafePlayers.Contains(actualplacer.UID))
+                    {
+                        SafePlayers.Add(actualplacer.UID);
+                    }
+                }
+            }
+            if (!Place) { return; }
+            if (e.Name.ToLower().Contains("sleepingbag") || e.Name.ToLower().Contains("bed"))
+            {
+                RaycastHit cachedRaycast;
+                Facepunch.MeshBatch.MeshBatchInstance cachedhitInstance;
+                bool cachedBoolean;
+                Character c = actualplacer.PlayerClient.netUser.playerClient.controllable.character;
+                if (!(MeshBatchPhysics.Linecast(c.eyesOrigin, e.Location, out cachedRaycast, out cachedBoolean, out cachedhitInstance))) return;
+                if (cachedhitInstance == null && !cachedRaycast.collider.gameObject.name.ToLower().Contains("door")) return;
+                if (Vector3.Distance(c.eyesOrigin, e.Location) > 9f) return;
+                if (e.Location.y - c.eyesOrigin.y > 1f) return;
+                string line = DateTime.Now + " " + actualplacer.Name + " tried to spawn " + e.Name + " from " + actualplacer.Location + " to " + e.Location;
+                Server.GetServer().BroadcastFrom("EAC", red + "Detected Wall Entity Placement usage at " + actualplacer.Name);
+                file = new System.IO.StreamWriter(ppath, true);
+                file.WriteLine(line);
+                file.Close();
+                Warn(actualplacer, Penalities.WallPlace);
+                e.Destroy();
+            }
         }
 
         public void OnPlayerKilled(DeathEvent de)
@@ -1166,7 +1227,7 @@ namespace EACV2
             {
                 if (HighPings.Contains(p.UID)) return;
                 line = DateTime.Now + " [SpeedHack] Detected Speedhack usage at " + p.Name + "(" + cdist + "m / s)" + " | " +
-                    p.SteamID + " POSSIBLE LAGG, Distance bigger than 25, Ping: " + p.Ping;
+                    p.SteamID + " POSSIBLE LAGG, Distance bigger than " + speedMaxDistance + ", Ping: " + p.Ping;
                 MessageAdmins(yellow + p.Name + " might be using speedhack. Ping: " + p.Ping);
                 file = new System.IO.StreamWriter(ppath, true);
                 file.WriteLine(line);
@@ -1330,7 +1391,7 @@ namespace EACV2
             Server.GetServer().BroadcastFrom("EAC", red + "Warned " + p.Name + " Warnings [" + data + "] (" + i + "/" + PenalityWarns[data] + ")");
         }
 
-        public EACTimedEvent CreateParallelTimer(int timeoutDelay, Dictionary<string, object> args)
+        public static EACTimedEvent CreateParallelTimer(int timeoutDelay, Dictionary<string, object> args)
         {
             EACTimedEvent timedEvent = new EACTimedEvent(timeoutDelay);
             timedEvent.Args = args;
@@ -1358,34 +1419,98 @@ namespace EACV2
                 {
                     pl.Disconnect();
                 }
-                return;
             }
-            if (data.ContainsKey("dizzy"))
+            else if (data.ContainsKey("dizzy"))
             {
                 var loc = DataStore.GetInstance().Get("EACDizzy", pl.UID);
                 if (loc != null)
                 {
                     var loc2 = (Vector3) loc;
-                    if (loc2 != Vector3.zero)
+                    var plloc = pl.Location;
+                    if (loc2 != Vector3.zero && plloc != Vector3.zero)
                     {
-                        var vdist = Vector3.Distance(loc2, pl.Location);
-                        var dist = Math.Round(Math.Abs(loc2.y - pl.Location.y), 2);
-                        if (dist >= 30 || vdist >= 26 || dist == 0)
+                        var vdist = Vector3.Distance(loc2, plloc);
+                        var dist = Math.Round(Math.Abs(loc2.y - plloc.y), 2);
+                        if (dist >= 30 || vdist >= 26 || (int) dist == 0)
                         {
                             return;
                         }
                         if (dist >= 2.50)
                         {
                             file2 = new System.IO.StreamWriter(ppath, true);
-                            file2.WriteLine(DateTime.Now + " [Dizzy] " + pl.Name + "|" + pl.SteamID + " Player's location when launching timer: " + loc2 + " Loc Now: " + pl.Location + " Dist: " + dist);
+                            file2.WriteLine(DateTime.Now + " [Dizzy] " + pl.Name + "|" + pl.SteamID + " Player's location when launching timer: " + loc2 + " Loc Now: " + plloc + " Dist: " + dist);
                             int r = rnd.Next(1, 8156);
                             string l = cfg.GetSetting("DefaultLoc", r.ToString());
                             Vector3 v = Util.GetUtil().ConvertStringToVector3(l);
-                            DataStore.GetInstance().Add("DizzySpawn", pl.UID, v);
-                            pl.TeleportTo(v, false);
+                            if (!pl.IsOnline)
+                            {
+                                DataStore.GetInstance().Add("DizzySpawn", pl.UID, v);
+                            }
+                            else
+                            {
+                                pl.TeleportTo(v, false);
+                            }
                             file2.WriteLine(DateTime.Now + " [Dizzy] " + pl.Name + "|" + pl.SteamID + " got dizzy warn!");
                             file2.Close();
                             Warn(pl, Penalities.Dizzy, true);
+                        }
+                    }
+                }
+            }
+            else if (data.ContainsKey("teleport"))
+            {
+                var dest = data["Dest"];
+                if (dest != null)
+                {
+                    var loc2 = (Vector3)dest;
+                    var plloc = pl.Location;
+                    if (loc2 != Vector3.zero && plloc != Vector3.zero)
+                    {
+                        var vdist = Vector3.Distance(loc2, plloc);
+                        var dist = Math.Round(Math.Abs(loc2.y - plloc.y), 2);
+                        var Trial = (int) data["Trial"];
+                        if (dist >= 30 || vdist >= 26 || (int) dist == 0)
+                        {
+                            return;
+                        }
+                        if (dist >= 2.50)
+                        {
+                            if (Trial <= 2)
+                            {
+                                file2 = new System.IO.StreamWriter(ppath, true);
+                                file2.WriteLine(DateTime.Now + " [Teleport] " + pl.Name + "|" + pl.SteamID +
+                                                " Player's location when launching timer: " + loc2 + " Loc Now: " +
+                                                pl.Location + " Dist: " + dist + " Trial: " + Trial);
+                                file2.Close();
+                                var dict = new Dictionary<string, object>();
+                                dict["Player"] = pl;
+                                dict["Dest"] = dest;
+                                dict["Trial"] = Trial + 1;
+                                dict["teleport"] = 1;
+                                CreateParallelTimer(2000, dict).Start();
+                            }
+                            else
+                            {
+                                file2 = new System.IO.StreamWriter(ppath, true);
+                                file2.WriteLine(DateTime.Now + " [Teleport] " + pl.Name + "|" + pl.SteamID +
+                                                " Player's location when launching timer: " + loc2 + " Loc Now: " +
+                                                pl.Location + " Dist: " + dist + " Trial: " + Trial);
+                                file2.WriteLine(DateTime.Now + " [Teleport] " + pl.Name + "|" + pl.SteamID +
+                                                " Teleported to a random location!");
+                                file2.Close();
+                                int r = rnd.Next(1, 8156);
+                                string l = cfg.GetSetting("DefaultLoc", r.ToString());
+                                Vector3 v = Util.GetUtil().ConvertStringToVector3(l);
+                                MessageAdmins(yellow + pl.Name + " tried to glitch while teleporting. Might be using Dizzy?");
+                                if (!pl.IsOnline)
+                                {
+                                    DataStore.GetInstance().Add("DizzySpawn", pl.UID, v);
+                                }
+                                else
+                                {
+                                    pl.TeleportTo(v, false);
+                                }
+                            }
                         }
                     }
                 }
