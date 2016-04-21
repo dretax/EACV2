@@ -118,7 +118,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.1"); }
+            get { return new Version("2.0.2"); }
         }
 
         public override void Initialize()
@@ -344,7 +344,10 @@ namespace EACV2
 
         public void OnPlayerDisconnected(Fougerite.Player player)
         {
-            DataStore.GetInstance().Add("EACDizzy", player.UID, player.DisconnectLocation);
+            if (CheckForObjects(player.DisconnectLocation))
+            {
+                DataStore.GetInstance().Add("EACDizzy", player.UID, player.DisconnectLocation);
+            }
         }
 
         public void OnEntityDeployed(Fougerite.Player pl, Fougerite.Entity e, Fougerite.Player actualplacer)
@@ -1328,6 +1331,11 @@ namespace EACV2
             return Physics.OverlapSphere(v, 5f).Any(collider => collider.GetComponent<UnityEngine.MeshCollider>());
         }
 
+        internal static bool CheckForObjects(Vector3 v)
+        {
+            return Physics.OverlapSphere(v, 3.5f).Any(collider => collider.GetComponent<UnityEngine.MeshCollider>());
+        }
+
         private static void MessageAdmins(string msg)
         {
             foreach (Fougerite.Player p in Fougerite.Server.GetServer().Players.Where(p => p.Admin || p.Moderator))
@@ -1336,7 +1344,7 @@ namespace EACV2
             }
         }
 
-        private static void Warn(Fougerite.Player p, Penalities data, bool kick = false)
+        internal static void Warn(Fougerite.Player p, Penalities data, bool kick = false)
         {
             var l = p.Location;
             int i = 1;
