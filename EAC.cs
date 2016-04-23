@@ -118,7 +118,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.2"); }
+            get { return new Version("2.0.3"); }
         }
 
         public override void Initialize()
@@ -1333,7 +1333,8 @@ namespace EACV2
 
         internal static bool CheckForObjects(Vector3 v)
         {
-            return Physics.OverlapSphere(v, 3.5f).Any(collider => collider.GetComponent<UnityEngine.MeshCollider>());
+            var x = Physics.OverlapSphere(v, 3.5f);
+            return x.Any(hit => hit.collider.gameObject.name.Contains("__MESHBATCH_PHYSICAL_OUTPUT") || hit.collider.gameObject.name.ToLower().Contains("shelter"));
         }
 
         private static void MessageAdmins(string msg)
