@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Timers;
 using Fougerite;
 using Fougerite.Events;
 using UnityEngine;
+using Timer = System.Timers.Timer;
 
 namespace EACV2
 {
@@ -118,7 +120,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.3"); }
+            get { return new Version("2.0.4"); }
         }
 
         public override void Initialize()
@@ -344,8 +346,24 @@ namespace EACV2
 
         public void OnPlayerDisconnected(Fougerite.Player player)
         {
+            if (player.DisconnectLocation == Vector3.zero)
+            {
+                return;
+            }
             if (CheckForObjects(player.DisconnectLocation))
             {
+                RaycastHit cachedRaycast;
+                Facepunch.MeshBatch.MeshBatchInstance cachedhitInstance;
+                bool cachedBoolean;
+                if (!Facepunch.MeshBatch.MeshBatchPhysics.Raycast(player.DisconnectLocation + UnderPlayerAdjustement, Vector3Down, out cachedRaycast, out cachedBoolean, out cachedhitInstance))
+                {
+                    return;
+                }
+                if (cachedhitInstance == null) { return; }
+                if (!cachedhitInstance.graphicalModel.ToString().Contains("ceiling") && !cachedhitInstance.graphicalModel.ToString().Contains("ramp"))
+                {
+                    return;
+                }
                 DataStore.GetInstance().Add("EACDizzy", player.UID, player.DisconnectLocation);
             }
         }
@@ -401,10 +419,8 @@ namespace EACV2
             if (de.VictimIsPlayer && de.Victim != null)
             {
                 Fougerite.Player victim = (Fougerite.Player)de.Victim;
-                if (FlySuspect.ContainsKey(victim.UID))
-                {
-                    FlySuspect.Remove(victim.UID);
-                }
+                if (FlySuspectC.ContainsKey(victim.UID)) { FlySuspectC.Remove(victim.UID); }
+                if (FlySuspect.ContainsKey(victim.UID)) { FlySuspect.Remove(victim.UID); }
             }
         }
 
@@ -489,16 +505,16 @@ namespace EACV2
                 List<Vector3> vs = new List<Vector3>();
                 vs.Add(new Vector3(newl.x - 1.0f, newl.y, newl.z));
                 vs.Add(new Vector3(newl.x - 2.0f, newl.y, newl.z));
-                vs.Add(new Vector3(newl.x - 3.0f, newl.y, newl.z));
+                //vs.Add(new Vector3(newl.x - 3.0f, newl.y, newl.z));
                 vs.Add(new Vector3(newl.x + 1.0f, newl.y, newl.z));
                 vs.Add(new Vector3(newl.x + 2.0f, newl.y, newl.z));
-                vs.Add(new Vector3(newl.x + 3.0f, newl.y, newl.z));
+                //vs.Add(new Vector3(newl.x + 3.0f, newl.y, newl.z));
                 vs.Add(new Vector3(newl.x, newl.y, newl.z - 1.0f));
                 vs.Add(new Vector3(newl.x, newl.y, newl.z - 2.0f));
-                vs.Add(new Vector3(newl.x, newl.y, newl.z - 3.0f));
+                //vs.Add(new Vector3(newl.x, newl.y, newl.z - 3.0f));
                 vs.Add(new Vector3(newl.x, newl.y, newl.z + 1.0f));
                 vs.Add(new Vector3(newl.x, newl.y, newl.z + 2.0f));
-                vs.Add(new Vector3(newl.x, newl.y, newl.z + 3.0f));
+                //vs.Add(new Vector3(newl.x, newl.y, newl.z + 3.0f));
                 if (vs.Any(PlayerHandlerHasGround))
                 {
                     return;
@@ -624,10 +640,20 @@ namespace EACV2
 
         public void OnPlayerSpawned(Fougerite.Player player, SpawnEvent se)
         {
+            var location = player.Location;
             if (FConnected.Contains(player.UID))
             {
+                if (location != Vector3.zero && !CheckForObjects(location))
+                {
+                    return;
+                }
                 if (DataStore.GetInstance().Get("EACDizzy", player.UID) != null)
                 {
+                    if (Debug.Contains(player.UID))
+                    {
+                        player.MessageFrom("EAC", "Detected parts around. Location Saved: " 
+                            + ((Vector3) DataStore.GetInstance().Get("EACDizzy", player.UID)));
+                    }
                     var dict = new Dictionary<string, object>();
                     dict["Player"] = player;
                     dict["dizzy"] = 1;
@@ -783,6 +809,17 @@ namespace EACV2
                     else
                     {
                         wallhack[attacker.UID] = num2 - 1;
+                    }
+                }
+                else if (num2 <= 0)
+                {
+                    if (s)
+                    {
+                        if (shotgwallhack.ContainsKey(attacker.UID)) { shotgwallhack.Remove(attacker.UID); }
+                    }
+                    else
+                    {
+                        if (wallhack.ContainsKey(attacker.UID)) { wallhack.Remove(attacker.UID); }
                     }
                 }
             }
@@ -948,6 +985,17 @@ namespace EACV2
                         else
                         {
                             wallhack[attacker.UID] = num2 - 1;
+                        }
+                    }
+                    else if (num2 <= 0)
+                    {
+                        if (s)
+                        {
+                            if (shotgwallhack.ContainsKey(attacker.UID)) { shotgwallhack.Remove(attacker.UID); }
+                        }
+                        else
+                        {
+                            if (wallhack.ContainsKey(attacker.UID)) { wallhack.Remove(attacker.UID); }
                         }
                     }
                 }
@@ -1408,7 +1456,7 @@ namespace EACV2
             return timedEvent;
         }
 
-        private static void Callback(EACTimedEvent e)
+        public static void Callback(EACTimedEvent e)
         {
             var data = e.Args;
             e.Kill();
@@ -1417,13 +1465,13 @@ namespace EACV2
                 Notified.Remove((ulong)data["notif"]);
                 return;
             }
-            Fougerite.Player pl = data["Player"] as Fougerite.Player;
-            if (!pl.IsOnline)
-            {
-                return;
-            }
+            Fougerite.Player pl = (Fougerite.Player) data["Player"];
             if (data.ContainsKey("kick"))
             {
+                if (!pl.IsOnline)
+                {
+                    return;
+                }
                 if (pl.IsOnline && !pl.IsDisconnecting)
                 {
                     pl.Disconnect();
@@ -1434,6 +1482,15 @@ namespace EACV2
                 var loc = DataStore.GetInstance().Get("EACDizzy", pl.UID);
                 if (loc != null)
                 {
+                    if (!pl.IsOnline)
+                    {
+                        int r = rnd.Next(1, 8156);
+                        string l = cfg.GetSetting("DefaultLoc", r.ToString());
+                        Vector3 v = Util.GetUtil().ConvertStringToVector3(l);
+                        DataStore.GetInstance().Add("DizzySpawn", pl.UID, v);
+                        DataStore.GetInstance().Remove("EACDizzy", pl.UID);
+                        return;
+                    }
                     var loc2 = (Vector3) loc;
                     var plloc = pl.Location;
                     if (loc2 != Vector3.zero && plloc != Vector3.zero)
@@ -1471,6 +1528,14 @@ namespace EACV2
                 var dest = data["Dest"];
                 if (dest != null)
                 {
+                    if (!pl.IsOnline)
+                    {
+                        int r = rnd.Next(1, 8156);
+                        string l = cfg.GetSetting("DefaultLoc", r.ToString());
+                        Vector3 v = Util.GetUtil().ConvertStringToVector3(l);
+                        DataStore.GetInstance().Add("DizzySpawn", pl.UID, v);
+                        return;
+                    }
                     var loc2 = (Vector3)dest;
                     var plloc = pl.Location;
                     if (loc2 != Vector3.zero && plloc != Vector3.zero)
