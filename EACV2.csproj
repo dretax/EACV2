@@ -54,6 +54,10 @@
     <Reference Include="Fougerite">
       <HintPath>E:\Users\DreTaX\Documents\Visual Studio 2013\Projects\FougeriteProject\bin\Fougerite.dll</HintPath>
     </Reference>
+    <Reference Include="RustPP, Version=1.1.7.9, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>E:\Users\DreTaX\Documents\Visual Studio 2013\Projects\FougeriteProject\bin\modules\RustPP\RustPP.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />

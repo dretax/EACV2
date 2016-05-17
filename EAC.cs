@@ -6,6 +6,8 @@ using System.Threading;
 using System.Timers;
 using Fougerite;
 using Fougerite.Events;
+using RustPP.Commands;
+using RustPP.Social;
 using UnityEngine;
 using Timer = System.Timers.Timer;
 
@@ -85,6 +87,7 @@ namespace EACV2
         public bool DisableTeleportCheckonMods = true;
         public bool EnableFlyCheckonMods = false;
         public bool EnableFlyCheckonAdmins = false;
+        public bool RustPPSupport = false;
 
         public int DizzyWarnings = 1;
         public int FlyJumpWarnings = 5;
@@ -120,7 +123,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.4"); }
+            get { return new Version("2.0.5"); }
         }
 
         public override void Initialize()
@@ -209,6 +212,7 @@ namespace EACV2
             Fougerite.Hooks.OnPlayerHurt += OnPlayerHurt;
             Fougerite.Hooks.OnPlayerTeleport += OnPlayerTeleport;
             Fougerite.Hooks.OnEntityDeployedWithPlacer += OnEntityDeployed;
+            Fougerite.Hooks.OnModulesLoaded += OnModulesLoaded;
             Start();
         }
 
@@ -226,6 +230,7 @@ namespace EACV2
             Fougerite.Hooks.OnPlayerHurt -= OnPlayerHurt;
             Fougerite.Hooks.OnPlayerTeleport -= OnPlayerTeleport;
             Fougerite.Hooks.OnEntityDeployedWithPlacer -= OnEntityDeployed;
+            Fougerite.Hooks.OnModulesLoaded -= OnModulesLoaded;
         }
 
         private void ReloadConfig()
@@ -333,6 +338,14 @@ namespace EACV2
          *
          */
 
+        public void OnModulesLoaded()
+        {
+            if (Fougerite.Server.GetServer().HasRustPP)
+            {
+                RustPPSupport = true;
+            }
+        }
+
         public void OnPlayerTeleport(Fougerite.Player player, Vector3 from, Vector3 dest)
         {
             if (!Teleport) { return;}
@@ -363,6 +376,21 @@ namespace EACV2
                 if (!cachedhitInstance.graphicalModel.ToString().Contains("ceiling") && !cachedhitInstance.graphicalModel.ToString().Contains("ramp"))
                 {
                     return;
+                }
+                var entity = new Entity(cachedhitInstance.gameObject.collider.GetComponent<StructureComponent>());
+                if (entity.OwnerID == player.SteamID)
+                {
+                    return;
+                }
+                if (RustPPSupport)
+                {
+                    var friendlist = Fougerite.Server.GetServer().GetRustPPAPI().GetFriendsCommand.GetFriendsLists();
+                    FriendList ls = (FriendList)friendlist[player.UID];
+                    var owneruid = Convert.ToUInt64(entity.OwnerID);
+                    if (ls.isFriendWith(owneruid) && DataStore.GetInstance().Get("EACAllow", owneruid) != null)
+                    {
+                        return;
+                    }
                 }
                 DataStore.GetInstance().Add("EACDizzy", player.UID, player.DisconnectLocation);
             }
@@ -733,9 +761,9 @@ namespace EACV2
                     if (victim != null)
                     {
                         victim.MessageFrom("EAC",
-                            orange + "You are possibly being targeted by " + yellow + attacker.Name);
+                            orange + "Your items are targeted by " + yellow + attacker.Name);
                         victim.MessageFrom("EAC",
-                            orange + "We detected Silent Aim Usage at him, stay behind walls so we can protect you.");
+                            orange + "We are protecting your stuffs against silent aim.");
                         victim.MessageFrom("EAC", orange + "His actions were logged, report this to the admins.");
                         line = DateTime.Now + " [SilentAim] SUSPECTING ENTITY Silent Aim at " + attacker.Name + "(" + attacker.SteamID + ") , he tried to shoot " + victim.Name + " (" + victim.SteamID + ")" + "'s items through walls. From: " + attackerloc +
                                " to " + lloc + " Ping: " + attacker.Ping;
@@ -1037,6 +1065,7 @@ namespace EACV2
                 if (args.Length == 0)
                 {
                     pl.MessageFrom("EAC", green + "EAC " + yellow + " V" + Version + " [COLOR#FFFFFF] By DreTaX");
+                    pl.MessageFrom("EAC", green + "/eac friendmode - Your friends will not be checked for Dizzy at your Ceilings");
                     if (pl.Admin || pl.Moderator)
                     {
                         pl.MessageFrom("EAC", green + "/eac reload - Reloads EAC Config");
@@ -1070,6 +1099,18 @@ namespace EACV2
                                 {
                                     NextWarned.Remove(pl.UID);
                                     pl.MessageFrom("EAC", orange + "Disabled!");
+                                }
+                                break;
+                            case "friendmode":
+                                if (DataStore.GetInstance().Get("EACAllow", pl.UID) != null)
+                                {
+                                    DataStore.GetInstance().Remove("EACAllow", pl.UID);
+                                    pl.MessageFrom("EAC", orange + "Dizzy Bypass for Friend at your Ceilings is DISABLED.");
+                                }
+                                else
+                                {
+                                    DataStore.GetInstance().Add("EACAllow", pl.UID, true);
+                                    pl.MessageFrom("EAC", orange + "Dizzy Bypass for Friend at your Ceilings is ENABLED.");
                                 }
                                 break;
                             case "debug":
