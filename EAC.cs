@@ -9,6 +9,7 @@ using Fougerite.Events;
 using RustPP.Commands;
 using RustPP.Social;
 using UnityEngine;
+using Player = Fougerite.Player;
 using Timer = System.Timers.Timer;
 
 namespace EACV2
@@ -95,7 +96,7 @@ namespace EACV2
         public int SpeedWarnings = 5;
         public int EntityPlaceWarnings = 1;
         public int TimerC = 120000;
-        public double DizzyDistance = 2.50;
+        public static double DizzyDistance = 2.50;
 
         public static int PingToIgnore = 250;
 
@@ -123,7 +124,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.5"); }
+            get { return new Version("2.0.6"); }
         }
 
         public override void Initialize()
@@ -365,33 +366,33 @@ namespace EACV2
             }
             if (CheckForObjects(player.DisconnectLocation))
             {
-                RaycastHit cachedRaycast;
-                Facepunch.MeshBatch.MeshBatchInstance cachedhitInstance;
-                bool cachedBoolean;
-                if (!Facepunch.MeshBatch.MeshBatchPhysics.Raycast(player.DisconnectLocation + UnderPlayerAdjustement, Vector3Down, out cachedRaycast, out cachedBoolean, out cachedhitInstance))
+                /*foreach (var x in Physics.OverlapSphere(dcloc, 3.5f))
                 {
-                    return;
-                }
-                if (cachedhitInstance == null) { return; }
-                if (!cachedhitInstance.graphicalModel.ToString().Contains("ceiling") && !cachedhitInstance.graphicalModel.ToString().Contains("ramp"))
-                {
-                    return;
-                }
-                var entity = new Entity(cachedhitInstance.gameObject.collider.GetComponent<StructureComponent>());
-                if (entity.OwnerID == player.SteamID)
-                {
-                    return;
-                }
-                if (RustPPSupport)
-                {
-                    var friendlist = Fougerite.Server.GetServer().GetRustPPAPI().GetFriendsCommand.GetFriendsLists();
-                    FriendList ls = (FriendList)friendlist[player.UID];
-                    var owneruid = Convert.ToUInt64(entity.OwnerID);
-                    if (ls.isFriendWith(owneruid) && DataStore.GetInstance().Get("EACAllow", owneruid) != null)
+                    if (x.name != "__MESHBATCH_PHYSICAL_OUTPUT")
+                    {
+                        continue;
+                    }
+                    if (x.gameObject.transform.position == Vector3.zero)
+                    {
+                        continue;
+                    }
+                    var entity = Util.GetUtil().FindStructureAt(x.gameObject.transform.position, 2f);
+                    if (entity.OwnerID == player.SteamID)
                     {
                         return;
                     }
-                }
+                    if (RustPPSupport)
+                    {
+                        var friendlist = Fougerite.Server.GetServer().GetRustPPAPI().GetFriendsCommand.GetFriendsLists();
+                        FriendList ls = (FriendList) friendlist[player.UID];
+                        var owneruid = Convert.ToUInt64(entity.OwnerID);
+                        if (ls.isFriendWith(owneruid) && DataStore.GetInstance().Get("EACAllow", owneruid) != null)
+                        {
+                            return;
+                        }
+                    }
+                    break;
+                }*/
                 DataStore.GetInstance().Add("EACDizzy", player.UID, player.DisconnectLocation);
             }
         }
@@ -1534,6 +1535,12 @@ namespace EACV2
                     }
                     var loc2 = (Vector3) loc;
                     var plloc = pl.Location;
+                    if (Vector3.Distance(loc2, plloc) <= 0.3f && !data.ContainsKey("ReCheck"))
+                    {
+                        data["ReCheck"] = 1;
+                        CreateParallelTimer(3000, data).Start();
+                        return;
+                    }
                     if (loc2 != Vector3.zero && plloc != Vector3.zero)
                     {
                         var vdist = Vector3.Distance(loc2, plloc);
@@ -1542,7 +1549,7 @@ namespace EACV2
                         {
                             return;
                         }
-                        if (dist >= 2.50)
+                        if (dist >= DizzyDistance)
                         {
                             file2 = new System.IO.StreamWriter(ppath, true);
                             file2.WriteLine(DateTime.Now + " [Dizzy] " + pl.Name + "|" + pl.SteamID + " Player's location when launching timer: " + loc2 + " Loc Now: " + plloc + " Dist: " + dist);
@@ -1562,6 +1569,7 @@ namespace EACV2
                             Warn(pl, Penalities.Dizzy, true);
                         }
                     }
+                    DataStore.GetInstance().Remove("EACDizzy", pl.UID);
                 }
             }
             else if (data.ContainsKey("teleport"))
