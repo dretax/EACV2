@@ -124,7 +124,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.6"); }
+            get { return new Version("2.0.7"); }
         }
 
         public override void Initialize()
@@ -364,37 +364,39 @@ namespace EACV2
             {
                 return;
             }
-            if (CheckForObjects(player.DisconnectLocation))
+            if (!CheckForObjects(player.DisconnectLocation)) { return;}
+            foreach (var x in Physics.OverlapSphere(player.DisconnectLocation, 3.5f))
             {
-                /*foreach (var x in Physics.OverlapSphere(dcloc, 3.5f))
+                if (x.name != "__MESHBATCH_PHYSICAL_OUTPUT")
                 {
-                    if (x.name != "__MESHBATCH_PHYSICAL_OUTPUT")
-                    {
-                        continue;
-                    }
-                    if (x.gameObject.transform.position == Vector3.zero)
-                    {
-                        continue;
-                    }
-                    var entity = Util.GetUtil().FindStructureAt(x.gameObject.transform.position, 2f);
-                    if (entity.OwnerID == player.SteamID)
+                    continue;
+                }
+                if (x.gameObject.transform.position == Vector3.zero)
+                {
+                    continue;
+                }
+                //var entity = Util.GetUtil().FindStructureAt(x.gameObject.transform.position, 2f);
+                var ownerid = GetHouseOwner(x.gameObject.transform.position);
+                if (ownerid == 0)
+                {
+                    break;
+                }
+                if (ownerid == player.UID)
+                {
+                    return;
+                }
+                if (RustPPSupport)
+                {
+                    var friendlist = Fougerite.Server.GetServer().GetRustPPAPI().GetFriendsCommand.GetFriendsLists();
+                    FriendList ls = (FriendList) friendlist[player.UID];
+                    if (ls.isFriendWith(ownerid) && DataStore.GetInstance().Get("EACAllow", ownerid) != null)
                     {
                         return;
                     }
-                    if (RustPPSupport)
-                    {
-                        var friendlist = Fougerite.Server.GetServer().GetRustPPAPI().GetFriendsCommand.GetFriendsLists();
-                        FriendList ls = (FriendList) friendlist[player.UID];
-                        var owneruid = Convert.ToUInt64(entity.OwnerID);
-                        if (ls.isFriendWith(owneruid) && DataStore.GetInstance().Get("EACAllow", owneruid) != null)
-                        {
-                            return;
-                        }
-                    }
-                    break;
-                }*/
-                DataStore.GetInstance().Add("EACDizzy", player.UID, player.DisconnectLocation);
+                }
+                break;
             }
+            DataStore.GetInstance().Add("EACDizzy", player.UID, player.DisconnectLocation);
         }
 
         public void OnEntityDeployed(Fougerite.Player pl, Fougerite.Entity e, Fougerite.Player actualplacer)
@@ -429,7 +431,7 @@ namespace EACV2
                 Facepunch.MeshBatch.MeshBatchInstance cachedhitInstance;
                 bool cachedBoolean;
                 Character c = actualplacer.PlayerClient.netUser.playerClient.controllable.character;
-                if (!(MeshBatchPhysics.Linecast(c.eyesOrigin, e.Location, out cachedRaycast, out cachedBoolean, out cachedhitInstance))) return;
+                if (!(Facepunch.MeshBatch.MeshBatchPhysics.Linecast(c.eyesOrigin, e.Location, out cachedRaycast, out cachedBoolean, out cachedhitInstance))) return;
                 if (cachedhitInstance == null && !cachedRaycast.collider.gameObject.name.ToLower().Contains("door")) return;
                 if (Vector3.Distance(c.eyesOrigin, e.Location) > 9f) return;
                 if (e.Location.y - c.eyesOrigin.y > 1f) return;
@@ -1114,6 +1116,14 @@ namespace EACV2
                                     pl.MessageFrom("EAC", orange + "Dizzy Bypass for Friend at your Ceilings is ENABLED.");
                                 }
                                 break;
+                            case "flush":
+                                if (pl.Admin)
+                                {
+                                    DataStore.GetInstance().Flush("EACDizzy");
+                                    DataStore.GetInstance().Flush("DizzySpawn");
+                                    pl.MessageFrom("EAC", orange + "Flushed!");
+                                }
+                                break;
                             case "debug":
                                 if (!Debug.Contains(pl.UID))
                                 {
@@ -1309,7 +1319,7 @@ namespace EACV2
                 if (HighPings.Contains(p.UID)) return;
                 line = DateTime.Now + " [SpeedHack] Detected Speedhack usage at " + p.Name + "(" + cdist + "m / s)" + " | " +
                     p.SteamID + " POSSIBLE LAGG, PING: " + p.Ping;
-                MessageAdmins(yellow + p.Name + " might be using speedhack. Ping: " + p.Ping);
+                MessageAdmins(yellow + p.Name + " might be using speedhack. Ping: " + p.Ping + " (" + cdist + "m / s)");
                 file = new System.IO.StreamWriter(ppath, true);
                 file.WriteLine(line);
                 file.Close();
@@ -1321,7 +1331,7 @@ namespace EACV2
                 if (HighPings.Contains(p.UID)) return;
                 line = DateTime.Now + " [SpeedHack] Detected Speedhack usage at " + p.Name + "(" + cdist + "m / s)" + " | " +
                     p.SteamID + " POSSIBLE LAGG, Distance bigger than " + speedMaxDistance + ", Ping: " + p.Ping;
-                MessageAdmins(yellow + p.Name + " might be using speedhack. Ping: " + p.Ping);
+                MessageAdmins(yellow + p.Name + " might be using speedhack. Ping: " + p.Ping + " (" + cdist + "m / s)");
                 file = new System.IO.StreamWriter(ppath, true);
                 file.WriteLine(line);
                 file.Close();
@@ -1361,7 +1371,7 @@ namespace EACV2
                 if (HighPings.Contains(p.UID)) return;
                 line = DateTime.Now + " [WalkSpeedHack] Detected Walk Speedhack usage at " + p.Name + "(" + cdist + "m / s)" + " | " +
                     p.SteamID + " POSSIBLE LAGG, PING: " + p.Ping;
-                MessageAdmins(yellow + p.Name + " might be using walk speedhack. Ping: " + p.Ping);
+                MessageAdmins(yellow + p.Name + " might be using walk speedhack. Ping: " + p.Ping + " (" + cdist + "m / s)");
                 file = new System.IO.StreamWriter(ppath, true);
                 file.WriteLine(line);
                 file.Close();
@@ -1373,7 +1383,7 @@ namespace EACV2
                 if (HighPings.Contains(p.UID)) return;
                 line = DateTime.Now + " [WalkSpeedHack] Detected Walk Speedhack usage at " + p.Name + "(" + cdist + "m / s)" + " | " +
                     p.SteamID + " POSSIBLE LAGG, PING: " + p.Ping;
-                MessageAdmins(yellow + p.Name + " might be using walk speedhack. Ping: " + p.Ping);
+                MessageAdmins(yellow + p.Name + " might be using walk speedhack. Ping: " + p.Ping + " (" + cdist + "m / s)");
                 file = new System.IO.StreamWriter(ppath, true);
                 file.WriteLine(line);
                 file.Close();
@@ -1399,6 +1409,37 @@ namespace EACV2
          * Other Methods
          *
          */
+
+        public ulong GetHouseOwner(Vector3 entitypos)
+        {
+            RaycastHit cachedRaycast;
+            StructureComponent cachedStructure;
+            Collider cachedCollider;
+            StructureMaster cachedMaster;
+            Facepunch.MeshBatch.MeshBatchInstance cachedhitInstance;
+            bool cachedBoolean;
+            if (!Facepunch.MeshBatch.MeshBatchPhysics.Raycast(new Ray(entitypos, new Vector3(0f, -1f, 0f)),
+                out cachedRaycast, out cachedBoolean, out cachedhitInstance))
+            {
+                return 0;
+            }
+            if (cachedhitInstance != null)
+            {
+                cachedCollider = cachedhitInstance.physicalColliderReferenceOnly;
+                if (cachedCollider == null)
+                {
+                    return 0;
+                }
+                cachedStructure = cachedCollider.GetComponent<StructureComponent>();
+                if (cachedStructure != null && cachedStructure._master != null)
+                {
+                    cachedMaster = cachedStructure._master;
+                    var id = cachedMaster.ownerID;
+                    return id;
+                }
+            }
+            return 0;
+        }
 
         private static bool PlayerHandlerHasGround(Vector3 pos)
         {
