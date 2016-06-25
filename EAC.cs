@@ -27,6 +27,7 @@ namespace EACV2
         public static IniParser SilentAimWarns;
         public static IniParser SpeedHackWarns;
         public static IniParser WallPlaceWarns;
+        public IniParser RecoilWarns;
         public static System.Random rnd;
         public static string ppath;
         public static List<ulong> Debug; 
@@ -45,6 +46,9 @@ namespace EACV2
 
         public static Dictionary<Penalities, IniParser> PenalityInis;
         public static Dictionary<Penalities, int> PenalityWarns;
+        public Dictionary<ulong, Angle2> ShootAngle;
+        public Dictionary<ulong, Angle2> SShootAngle;
+        public Dictionary<ulong, int> AngleC; 
         public static Vector3 UnderPlayerAdjustement = new Vector3(0f, -1.15f, 0f);
         public static Vector3 Vector3Down = new Vector3(0f, -1f, 0f);
         public static Vector3 Vector3Up = new Vector3(0f, 1f, 0f);
@@ -68,7 +72,8 @@ namespace EACV2
             FlyJump,
             SilentAim,
             Speed,
-            WallPlace
+            WallPlace,
+            NoRecoil
         }
 
 
@@ -84,6 +89,7 @@ namespace EACV2
         public bool Teleport = true;
         public bool PlayerWall = true;
         public bool EntityWall = true;
+        public bool NoRecoil = true;
         public bool DisableTeleportCheckonAdmins = true;
         public bool DisableTeleportCheckonMods = true;
         public bool EnableFlyCheckonMods = false;
@@ -95,6 +101,8 @@ namespace EACV2
         public int SilentAimWarnings = 2;
         public int SpeedWarnings = 5;
         public int EntityPlaceWarnings = 1;
+        public int RecoilWarnings = 1;
+        public int RecoilSuspectShots = 5;
         public int TimerC = 120000;
         public static double DizzyDistance = 2.50;
 
@@ -124,7 +132,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.7"); }
+            get { return new Version("2.0.8"); }
         }
 
         public override void Initialize()
@@ -135,6 +143,7 @@ namespace EACV2
             if (!File.Exists(Path.Combine(ModuleFolder, "SpeedHackWarns.ini"))) { File.Create(Path.Combine(ModuleFolder, "SpeedHackWarns.ini")).Dispose(); }
             if (!File.Exists(Path.Combine(ModuleFolder, "WallPlaceWarns.ini"))) { File.Create(Path.Combine(ModuleFolder, "WallPlaceWarns.ini")).Dispose(); }
             if (!File.Exists(Path.Combine(ModuleFolder, "DizzyWarns.ini"))) { File.Create(Path.Combine(ModuleFolder, "DizzyWarns.ini")).Dispose(); }
+            if (!File.Exists(Path.Combine(ModuleFolder, "RecoilWarns.ini"))) { File.Create(Path.Combine(ModuleFolder, "RecoilWarns.ini")).Dispose(); }
             ppath = Path.Combine(ModuleFolder, "CheatDetection.log");
             FConnected = new List<ulong>();
             NextWarned = new List<ulong>();
@@ -142,17 +151,22 @@ namespace EACV2
             Debug = new List<ulong>();
             SafePlayers = new List<ulong>();
             HighPings = new List<ulong>();
+            ShootAngle = new Dictionary<ulong, Angle2>();
+            SShootAngle = new Dictionary<ulong, Angle2>();
+            AngleC = new Dictionary<ulong, int>();
             FlyJumpWarns = new IniParser(Path.Combine(ModuleFolder, "FlyJumpWarns.ini"));
             SilentAimWarns = new IniParser(Path.Combine(ModuleFolder, "SilentAimWarns.ini"));
             SpeedHackWarns = new IniParser(Path.Combine(ModuleFolder, "SpeedHackWarns.ini"));
             WallPlaceWarns = new IniParser(Path.Combine(ModuleFolder, "WallPlaceWarns.ini"));
             DizzyWarns = new IniParser(Path.Combine(ModuleFolder, "DizzyWarns.ini"));
+            RecoilWarns = new IniParser(Path.Combine(ModuleFolder, "RecoilWarns.ini"));
             PenalityInis = new Dictionary<Penalities, IniParser>();
             PenalityInis[Penalities.FlyJump] = FlyJumpWarns;
             PenalityInis[Penalities.SilentAim] = SilentAimWarns;
             PenalityInis[Penalities.Speed] = SpeedHackWarns;
             PenalityInis[Penalities.WallPlace] = WallPlaceWarns;
             PenalityInis[Penalities.Dizzy] = DizzyWarns;
+            PenalityInis[Penalities.NoRecoil] = RecoilWarns;
 
             PenalityWarns = new Dictionary<Penalities, int>();
             PenalityWarns[Penalities.FlyJump] = FlyJumpWarnings;
@@ -160,6 +174,7 @@ namespace EACV2
             PenalityWarns[Penalities.Speed] = SpeedWarnings;
             PenalityWarns[Penalities.WallPlace] = EntityPlaceWarnings;
             PenalityWarns[Penalities.Dizzy] = DizzyWarnings;
+            PenalityWarns[Penalities.NoRecoil] = RecoilWarnings;
             rnd = new System.Random();
             cfg = new IniParser(Path.Combine(ModuleFolder, "DefaultLoc.ini"));
             wallhack = new Dictionary<ulong, int>();
@@ -180,12 +195,15 @@ namespace EACV2
                 Settings.AddSetting("Settings", "Walk", "false");
                 Settings.AddSetting("Settings", "PlayerWall", "true");
                 Settings.AddSetting("Settings", "EntityWall", "true");
+                Settings.AddSetting("Settings", "NoRecoil", "true");
+                Settings.AddSetting("Settings", "RecoilSuspectShots", RecoilSuspectShots.ToString());
                 Settings.AddSetting("Settings", "DizzyDistance", DizzyDistance.ToString());
                 Settings.AddSetting("Settings", "DizzyWarnings", DizzyWarnings.ToString());
                 Settings.AddSetting("Settings", "FlyJumpWarnings", FlyJumpWarnings.ToString());
                 Settings.AddSetting("Settings", "SilentAimWarnings", SilentAimWarnings.ToString());
                 Settings.AddSetting("Settings", "SpeedWarnings", SpeedWarnings.ToString());
                 Settings.AddSetting("Settings", "EntityPlaceWarnings", EntityPlaceWarnings.ToString());
+                Settings.AddSetting("Settings", "RecoilWarnings", RecoilWarnings.ToString());
                 Settings.AddSetting("Settings", "PingToIgnore", PingToIgnore.ToString());
                 Settings.AddSetting("Settings", "DisableTeleportCheckonAdmins", DisableTeleportCheckonAdmins.ToString());
                 Settings.AddSetting("Settings", "DisableTeleportCheckonMods", DisableTeleportCheckonMods.ToString());
@@ -214,6 +232,11 @@ namespace EACV2
             Fougerite.Hooks.OnPlayerTeleport += OnPlayerTeleport;
             Fougerite.Hooks.OnEntityDeployedWithPlacer += OnEntityDeployed;
             Fougerite.Hooks.OnModulesLoaded += OnModulesLoaded;
+            if (NoRecoil)
+            {
+                Fougerite.Hooks.OnShoot += OnShoot;
+                Fougerite.Hooks.OnShotgunShoot += OnShotgunShoot;
+            }
             Start();
         }
 
@@ -232,6 +255,11 @@ namespace EACV2
             Fougerite.Hooks.OnPlayerTeleport -= OnPlayerTeleport;
             Fougerite.Hooks.OnEntityDeployedWithPlacer -= OnEntityDeployed;
             Fougerite.Hooks.OnModulesLoaded -= OnModulesLoaded;
+            if (NoRecoil)
+            {
+                Fougerite.Hooks.OnShoot -= OnShoot;
+                Fougerite.Hooks.OnShotgunShoot -= OnShotgunShoot;
+            }
         }
 
         private void ReloadConfig()
@@ -245,11 +273,14 @@ namespace EACV2
                 SilentAimWarnings = int.Parse(Settings.GetSetting("Settings", "SilentAimWarnings"));
                 SpeedWarnings = int.Parse(Settings.GetSetting("Settings", "SpeedWarnings"));
                 EntityPlaceWarnings = int.Parse(Settings.GetSetting("Settings", "EntityPlaceWarnings"));
+                RecoilWarnings = int.Parse(Settings.GetSetting("Settings", "RecoilWarnings"));
+                RecoilSuspectShots = int.Parse(Settings.GetSetting("Settings", "RecoilSuspectShots"));
                 DizzyDistance = double.Parse(Settings.GetSetting("Settings", "DizzyDistance"));
                 FlyandJump = Settings.GetBoolSetting("Settings", "FlyandJump");
                 Speed = Settings.GetBoolSetting("Settings", "Speed");
                 Place = Settings.GetBoolSetting("Settings", "Place");
                 Dizzy = Settings.GetBoolSetting("Settings", "Dizzy");
+                NoRecoil = Settings.GetBoolSetting("Settings", "NoRecoil");
                 Teleport = Settings.GetBoolSetting("Settings", "Teleport");
                 Walk = Settings.GetBoolSetting("Settings", "Walk");
                 PlayerWall = Settings.GetBoolSetting("Settings", "PlayerWall");
@@ -265,12 +296,14 @@ namespace EACV2
                 SpeedHackWarns = new IniParser(Path.Combine(ModuleFolder, "SpeedHackWarns.ini"));
                 WallPlaceWarns = new IniParser(Path.Combine(ModuleFolder, "WallPlaceWarns.ini"));
                 DizzyWarns = new IniParser(Path.Combine(ModuleFolder, "DizzyWarns.ini"));
+                RecoilWarns = new IniParser(Path.Combine(ModuleFolder, "RecoilWarns.ini"));
                 PenalityInis = new Dictionary<Penalities, IniParser>();
                 PenalityInis[Penalities.FlyJump] = FlyJumpWarns;
                 PenalityInis[Penalities.SilentAim] = SilentAimWarns;
                 PenalityInis[Penalities.Speed] = SpeedHackWarns;
                 PenalityInis[Penalities.WallPlace] = WallPlaceWarns;
                 PenalityInis[Penalities.Dizzy] = DizzyWarns;
+                PenalityInis[Penalities.NoRecoil] = RecoilWarns;
 
                 PenalityWarns = new Dictionary<Penalities, int>();
                 PenalityWarns[Penalities.FlyJump] = FlyJumpWarnings;
@@ -278,6 +311,7 @@ namespace EACV2
                 PenalityWarns[Penalities.Speed] = SpeedWarnings;
                 PenalityWarns[Penalities.WallPlace] = EntityPlaceWarnings;
                 PenalityWarns[Penalities.Dizzy] = DizzyWarnings;
+                PenalityWarns[Penalities.NoRecoil] = RecoilWarnings;
             }
             catch (Exception ex)
             {
@@ -339,6 +373,87 @@ namespace EACV2
          *
          */
 
+        public void OnShotgunShoot(ShotgunShootEvent shootevent)
+        {
+            if (!NoRecoil) { return; }
+            Angle2 c = shootevent.Player.PlayerClient.netUser.playerClient.controllable.character.eyesAngles;
+            if (!SShootAngle.ContainsKey(shootevent.Player.UID))
+            {
+                SShootAngle[shootevent.Player.UID] = c;
+                return;
+            }
+            if (c != SShootAngle[shootevent.Player.UID])
+            {
+                SShootAngle[shootevent.Player.UID] = c;
+                if (AngleC.ContainsKey(shootevent.Player.UID))
+                {
+                    AngleC[shootevent.Player.UID] = AngleC[shootevent.Player.UID] - 1;
+                    if (AngleC[shootevent.Player.UID] <= 0)
+                    {
+                        AngleC.Remove(shootevent.Player.UID);
+                    }
+                }
+                return;
+            }
+            if (!AngleC.ContainsKey(shootevent.Player.UID))
+            {
+                AngleC[shootevent.Player.UID] = 1;
+            }
+            else
+            {
+                AngleC[shootevent.Player.UID] = AngleC[shootevent.Player.UID] + 1;
+                if (AngleC[shootevent.Player.UID] >= RecoilSuspectShots)
+                {
+                    string line = DateTime.Now + " [NoRecoil] " + shootevent.Player.Name + "-" + shootevent.Player.SteamID + " has No Recoil. Gun: " + shootevent.ShotgunDataBlock.name;
+                    file = new System.IO.StreamWriter(ppath, true);
+                    file.WriteLine(line);
+                    file.Close();
+                    Warn(shootevent.Player, Penalities.NoRecoil, true);
+                }
+            }
+        }
+
+        public void OnShoot(ShootEvent shootevent)
+        {
+            if (!NoRecoil) { return; }
+            Angle2 c = shootevent.Player.PlayerClient.netUser.playerClient.controllable.character.eyesAngles;
+            if (!ShootAngle.ContainsKey(shootevent.Player.UID))
+            {
+                ShootAngle[shootevent.Player.UID] = c;
+                return;
+            }
+            if (c != ShootAngle[shootevent.Player.UID])
+            {
+                ShootAngle[shootevent.Player.UID] = c;
+
+                if (AngleC.ContainsKey(shootevent.Player.UID))
+                {
+                    AngleC[shootevent.Player.UID] = AngleC[shootevent.Player.UID] - 1;
+                    if (AngleC[shootevent.Player.UID] <= 0)
+                    {
+                        AngleC.Remove(shootevent.Player.UID);
+                    }
+                }
+                return;
+            }
+            if (!AngleC.ContainsKey(shootevent.Player.UID))
+            {
+                AngleC[shootevent.Player.UID] = 1;
+            }
+            else
+            {
+                AngleC[shootevent.Player.UID] = AngleC[shootevent.Player.UID] + 1;
+                if (AngleC[shootevent.Player.UID] >= RecoilSuspectShots)
+                {
+                    string line = DateTime.Now + " [NoRecoil] " + shootevent.Player.Name + "-" + shootevent.Player.SteamID + " has No Recoil. Gun: " + shootevent.BulletWeaponDataBlock.name;
+                    file = new System.IO.StreamWriter(ppath, true);
+                    file.WriteLine(line);
+                    file.Close();
+                    Warn(shootevent.Player, Penalities.NoRecoil, true);
+                }
+            }
+        }
+
         public void OnModulesLoaded()
         {
             if (Fougerite.Server.GetServer().HasRustPP)
@@ -360,6 +475,18 @@ namespace EACV2
 
         public void OnPlayerDisconnected(Fougerite.Player player)
         {
+            if (ShootAngle.ContainsKey(player.UID))
+            {
+                ShootAngle.Remove(player.UID);
+            }
+            if (SShootAngle.ContainsKey(player.UID))
+            {
+                SShootAngle.Remove(player.UID);
+            }
+            if (AngleC.ContainsKey(player.UID))
+            {
+                AngleC.Remove(player.UID);
+            }
             if (player.DisconnectLocation == Vector3.zero)
             {
                 return;
@@ -435,7 +562,7 @@ namespace EACV2
                 if (cachedhitInstance == null && !cachedRaycast.collider.gameObject.name.ToLower().Contains("door")) return;
                 if (Vector3.Distance(c.eyesOrigin, e.Location) > 9f) return;
                 if (e.Location.y - c.eyesOrigin.y > 1f) return;
-                string line = DateTime.Now + " " + actualplacer.Name + " tried to spawn " + e.Name + " from " + actualplacer.Location + " to " + e.Location;
+                string line = DateTime.Now + " [EntityWallPlace] " + actualplacer.Name + " tried to spawn " + e.Name + " from " + actualplacer.Location + " to " + e.Location;
                 Server.GetServer().BroadcastFrom("EAC", red + "Detected Wall Entity Placement usage at " + actualplacer.Name);
                 file = new System.IO.StreamWriter(ppath, true);
                 file.WriteLine(line);
