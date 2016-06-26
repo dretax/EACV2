@@ -36,6 +36,9 @@ namespace EACV2
         public static List<ulong> Notified;
         public static List<ulong> SafePlayers;
         public static List<ulong> HighPings;
+        public List<ulong> FlyWhiteList;
+        public List<ulong> SpeedWhiteList;
+        public List<ulong> RecoilWhiteList;
         public static System.IO.StreamWriter file;
         public static System.IO.StreamWriter file2;
         public static Dictionary<ulong, int> wallhack;
@@ -94,6 +97,10 @@ namespace EACV2
         public bool DisableTeleportCheckonMods = true;
         public bool EnableFlyCheckonMods = false;
         public bool EnableFlyCheckonAdmins = false;
+        public bool EnableSpeedCheckonMods = false;
+        public bool EnableSpeedCheckonAdmins = false;
+        public bool EnableRecoilCheckonMods = false;
+        public bool EnableRecoilCheckonAdmins = false;
         public bool RustPPSupport = false;
 
         public int DizzyWarnings = 1;
@@ -132,7 +139,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.8"); }
+            get { return new Version("2.0.9"); }
         }
 
         public override void Initialize()
@@ -154,6 +161,9 @@ namespace EACV2
             ShootAngle = new Dictionary<ulong, Angle2>();
             SShootAngle = new Dictionary<ulong, Angle2>();
             AngleC = new Dictionary<ulong, int>();
+            FlyWhiteList = new List<ulong>();
+            SpeedWhiteList = new List<ulong>();
+            RecoilWhiteList = new List<ulong>();
             FlyJumpWarns = new IniParser(Path.Combine(ModuleFolder, "FlyJumpWarns.ini"));
             SilentAimWarns = new IniParser(Path.Combine(ModuleFolder, "SilentAimWarns.ini"));
             SpeedHackWarns = new IniParser(Path.Combine(ModuleFolder, "SpeedHackWarns.ini"));
@@ -209,6 +219,13 @@ namespace EACV2
                 Settings.AddSetting("Settings", "DisableTeleportCheckonMods", DisableTeleportCheckonMods.ToString());
                 Settings.AddSetting("Settings", "EnableFlyCheckonMods", EnableFlyCheckonMods.ToString());
                 Settings.AddSetting("Settings", "EnableFlyCheckonAdmins", EnableFlyCheckonAdmins.ToString());
+                Settings.AddSetting("Settings", "EnableSpeedCheckonMods", EnableSpeedCheckonMods.ToString());
+                Settings.AddSetting("Settings", "EnableSpeedCheckonAdmins", EnableSpeedCheckonAdmins.ToString());
+                Settings.AddSetting("Settings", "EnableRecoilCheckonMods", EnableRecoilCheckonMods.ToString());
+                Settings.AddSetting("Settings", "EnableRecoilCheckonAdmins", EnableRecoilCheckonAdmins.ToString());
+                Settings.AddSetting("Settings", "FlyWhiteList", "76512313411111,76512313422222");
+                Settings.AddSetting("Settings", "SpeedWhiteList", "76512313411111,76512313422222");
+                Settings.AddSetting("Settings", "RecoilWhiteList", "76512313411111,76512313422222");
                 Settings.AddSetting("Settings", "speedMinDistance", speedMinDistance.ToString());
                 Settings.AddSetting("Settings", "speedMaxDistance", speedMaxDistance.ToString());
                 Settings.AddSetting("Settings", "walkspeedMinDistance", walkspeedMinDistance.ToString());
@@ -275,6 +292,7 @@ namespace EACV2
                 EntityPlaceWarnings = int.Parse(Settings.GetSetting("Settings", "EntityPlaceWarnings"));
                 RecoilWarnings = int.Parse(Settings.GetSetting("Settings", "RecoilWarnings"));
                 RecoilSuspectShots = int.Parse(Settings.GetSetting("Settings", "RecoilSuspectShots"));
+                TimerC = int.Parse(Settings.GetSetting("Settings", "TimerC"));
                 DizzyDistance = double.Parse(Settings.GetSetting("Settings", "DizzyDistance"));
                 FlyandJump = Settings.GetBoolSetting("Settings", "FlyandJump");
                 Speed = Settings.GetBoolSetting("Settings", "Speed");
@@ -289,7 +307,38 @@ namespace EACV2
                 DisableTeleportCheckonAdmins = Settings.GetBoolSetting("Settings", "DisableTeleportCheckonAdmins");
                 EnableFlyCheckonMods = Settings.GetBoolSetting("Settings", "EnableFlyCheckonMods");
                 EnableFlyCheckonAdmins = Settings.GetBoolSetting("Settings", "EnableFlyCheckonAdmins");
-                TimerC = int.Parse(Settings.GetSetting("Settings", "TimerC"));
+                EnableSpeedCheckonMods = Settings.GetBoolSetting("Settings", "EnableSpeedCheckonMods");
+                EnableSpeedCheckonAdmins = Settings.GetBoolSetting("Settings", "EnableSpeedCheckonAdmins");
+                EnableRecoilCheckonMods = Settings.GetBoolSetting("Settings", "EnableRecoilCheckonMods");
+                EnableRecoilCheckonAdmins = Settings.GetBoolSetting("Settings", "EnableRecoilCheckonAdmins");
+
+                var list = Settings.GetSetting("Settings", "FlyWhiteList").Split(Convert.ToChar(","));
+                foreach (var x in list)
+                {
+                    ulong i;
+                    if (ulong.TryParse(x, out i))
+                    {
+                        FlyWhiteList.Add(i);
+                    }
+                }
+                list = Settings.GetSetting("Settings", "SpeedWhiteList").Split(Convert.ToChar(","));
+                foreach (var x in list)
+                {
+                    ulong i;
+                    if (ulong.TryParse(x, out i))
+                    {
+                        SpeedWhiteList.Add(i);
+                    }
+                }
+                list = Settings.GetSetting("Settings", "RecoilWhiteList").Split(Convert.ToChar(","));
+                foreach (var x in list)
+                {
+                    ulong i;
+                    if (ulong.TryParse(x, out i))
+                    {
+                        RecoilWhiteList.Add(i);
+                    }
+                }
 
                 FlyJumpWarns = new IniParser(Path.Combine(ModuleFolder, "FlyJumpWarns.ini"));
                 SilentAimWarns = new IniParser(Path.Combine(ModuleFolder, "SilentAimWarns.ini"));
@@ -345,9 +394,19 @@ namespace EACV2
             {
                 foreach (Fougerite.Player p in Server.GetServer().Players)
                 {
-                    if ((p.Admin || p.Moderator) && !Debug.Contains(p.UID))
+                    if (((p.Admin && !EnableSpeedCheckonAdmins) || (p.Admin && EnableSpeedCheckonAdmins && SpeedWhiteList.Contains(p.UID))))
                     {
-                        continue;
+                        if (!Debug.Contains(p.UID))
+                        {
+                            continue;
+                        }
+                    }
+                    if (((p.Moderator && !EnableSpeedCheckonMods) || (p.Moderator && EnableSpeedCheckonMods && SpeedWhiteList.Contains(p.UID))))
+                    {
+                        if (!Debug.Contains(p.UID))
+                        {
+                            continue;
+                        }
                     }
                     EACChecker phandler = p.PlayerClient.netUser.playerClient.gameObject.GetComponent<EACChecker>();
                     if (phandler == null) { phandler = p.PlayerClient.netUser.playerClient.gameObject.AddComponent<EACChecker>(); }
@@ -376,6 +435,16 @@ namespace EACV2
         public void OnShotgunShoot(ShotgunShootEvent shootevent)
         {
             if (!NoRecoil) { return; }
+            if ((!EnableRecoilCheckonAdmins && shootevent.Player.Admin) || (EnableRecoilCheckonAdmins && shootevent.Player.Admin 
+                && RecoilWhiteList.Contains(shootevent.Player.UID)))
+            {
+                return;
+            }
+            if ((!EnableRecoilCheckonMods && shootevent.Player.Moderator) || (EnableRecoilCheckonMods && shootevent.Player.Moderator
+                && RecoilWhiteList.Contains(shootevent.Player.UID)))
+            {
+                return;
+            }
             Angle2 c = shootevent.Player.PlayerClient.netUser.playerClient.controllable.character.eyesAngles;
             if (!SShootAngle.ContainsKey(shootevent.Player.UID))
             {
@@ -416,6 +485,16 @@ namespace EACV2
         public void OnShoot(ShootEvent shootevent)
         {
             if (!NoRecoil) { return; }
+            if ((!EnableRecoilCheckonAdmins && shootevent.Player.Admin) || (EnableRecoilCheckonAdmins && shootevent.Player.Admin
+                && RecoilWhiteList.Contains(shootevent.Player.UID)))
+            {
+                return;
+            }
+            if ((!EnableRecoilCheckonMods && shootevent.Player.Moderator) || (EnableRecoilCheckonMods && shootevent.Player.Moderator
+                && RecoilWhiteList.Contains(shootevent.Player.UID)))
+            {
+                return;
+            }
             Angle2 c = shootevent.Player.PlayerClient.netUser.playerClient.controllable.character.eyesAngles;
             if (!ShootAngle.ContainsKey(shootevent.Player.UID))
             {
@@ -602,7 +681,8 @@ namespace EACV2
             bool debugc = Debug.Contains(player.UID);
             if (!debugc)
             {
-                if ((player.Admin && !EnableFlyCheckonAdmins) || (player.Moderator && !EnableFlyCheckonMods))
+                if (((player.Admin && !EnableFlyCheckonAdmins) || (player.Admin && EnableFlyCheckonAdmins && FlyWhiteList.Contains(player.UID))) 
+                    || ((player.Moderator && !EnableFlyCheckonMods) || (player.Moderator && EnableFlyCheckonMods && FlyWhiteList.Contains(player.UID))))
                 {
                     return;
                 }
