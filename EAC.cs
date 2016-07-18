@@ -139,7 +139,7 @@ namespace EACV2
 
         public override Version Version
         {
-            get { return new Version("2.0.9"); }
+            get { return new Version("2.1.0"); }
         }
 
         public override void Initialize()
@@ -661,7 +661,7 @@ namespace EACV2
             }
         }
 
-        public void OnPlayerMove(HumanController hc, Vector3 origin, int encoded, ushort stateflags, uLink.NetworkMessageInfo info)
+        public void OnPlayerMove(HumanController hc, Vector3 origin, int encoded, ushort stateflags, uLink.NetworkMessageInfo info, Util.PlayerActions action)
         {
             if (!FlyandJump)
             {
@@ -688,6 +688,10 @@ namespace EACV2
                 }
             }
             if (!player.IsOnline)
+            {
+                return;
+            }
+            if (Util.PlayerActions.Jumping != action && Util.PlayerActions.RunJump != action && Util.PlayerActions.ESC != action)
             {
                 return;
             }
